@@ -300,11 +300,11 @@ input[type=color]{width:42px;height:34px;border:1px solid var(--line);border-rad
 .emphasis{
   margin-top:24px;padding:14px 18px;border-left:7px solid var(--accent,#0E4A84);
   background:rgba(14,74,132,.07);font-size:var(--em-size,26px);font-weight:800;
-  line-height:1.45;white-space:pre-line;word-break:keep-all;text-align:var(--body-align,left)
+  line-height:1.45;white-space:pre-line;word-break:keep-all;overflow-wrap:anywhere;text-align:var(--body-align,left)
 }
 .footer{
   margin-top:21px;font-size:var(--footer-size,19px);font-weight:550;line-height:1.5;
-  opacity:.74;white-space:pre-line;word-break:keep-all;text-align:var(--body-align,left)
+  opacity:.74;white-space:pre-line;word-break:keep-all;overflow-wrap:anywhere;text-align:var(--body-align,left)
 }
 .title-group,.body-group{position:relative}
 .title-group{transform:translateY(var(--title-shift,0px))}
@@ -521,6 +521,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
            role="textbox" aria-labelledby="emphasisLabel" aria-multiline="true"
            data-rich-key="emphasis" data-placeholder="강조할 문구가 있으면 입력"></div>
     </div>
+    <div class="range"><label for="emphasisSize">강조문 크기</label><input id="emphasisSize" type="range" min="15" max="60" value="26" aria-describedby="emphasisSizeO"><output id="emphasisSizeO">26px</output></div>
     <div class="field">
       <label id="footerLabel"><strong>하단 문구</strong><span>선택</span></label>
       <div id="footer" class="rich-editor medium" contenteditable="true"
@@ -531,7 +532,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
   <section class="section core-output" id="outputSection">
     <h2>3. 핵심 출력</h2>
-    <p class="note">PNG와 PDF는 화면 크기와 관계없이 A4 300dpi 상당 크기로 저장돼. 작업파일은 서버가 아니라 내 컴퓨터에 JSON으로 저장돼.</p>
+    <p class="note">인쇄는 A4 한 장으로 열려. PNG와 PDF는 화면 크기와 관계없이 A4 300dpi 상당 크기로 저장돼. 작업파일은 서버가 아니라 내 컴퓨터에 JSON으로 저장돼.</p>
 
     <div class="layout-warning" id="layoutWarning" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
@@ -543,6 +544,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div class="btns">
       <button class="btn primary" type="button" id="png">PNG 저장</button>
       <button class="btn primary" type="button" id="pdf">PDF 저장</button>
+      <button class="btn primary" type="button" id="print">인쇄</button>
       <button class="btn secondary" type="button" id="workSave">작업파일 저장</button>
       <button class="btn secondary" type="button" id="workLoad">작업파일 불러오기</button>
     </div>
@@ -792,9 +794,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <section class="patch-panel" id="patchPanel">
       <div class="patch-head">
         <strong>안내문 제작기 업데이트</strong>
-        <span class="patch-current" id="patchVersion">V1.7.0 · 2026.09.03</span>
+        <span class="patch-current" id="patchVersion">V1.7.1 · 2026.10.22</span>
       </div>
       <ul>
+        <li>강조문 크기 15~60px 조절 및 작업파일·자동저장 반영</li>
+        <li>인쇄 버튼으로 A4 한 페이지 인쇄·PDF 저장</li>
+        <li>본문 빈 여백·캐릭터 투명 테두리 충돌 오판 개선, 수정 위치 바로가기</li>
         <li>기기와 미리보기 크기에 관계없이 동일한 A4 300dpi 상당 PNG/PDF 출력</li>
         <li>여러 줄 붙여넣기의 첫 줄바꿈 유실 수정</li>
         <li>텍스트 초과·로고·캐릭터·사진 충돌을 구체적으로 표시하고 심각한 상태의 출력 차단</li>
@@ -826,7 +831,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 (()=>{
 "use strict";
 
-const APP_VERSION="1.7.0";
+const APP_VERSION="1.7.1";
 const STORAGE_KEY="noticeMakerV17";
 const LEGACY_STORAGE_KEYS=["noticeMakerV16","noticeMakerV14","noticeMakerV13"];
 const ALL_STORAGE_KEYS=[STORAGE_KEY,...LEGACY_STORAGE_KEYS];
@@ -927,6 +932,7 @@ const freshState=()=>({
   titleSize:56,
   subtitleSize:28,
   bodySize:25,
+  emphasisSize:26,
   bodyLine:1.62,
   contentTop:24,
   contentWidth:76,
@@ -1275,7 +1281,7 @@ function templateAssetRange(folder,count){
 
 function updateStaticMetadata(){
   $("versionBadge").textContent=`V${APP_VERSION}`;
-  $("patchVersion").textContent=`V${APP_VERSION} · 2026.09.03`;
+  $("patchVersion").textContent=`V${APP_VERSION} · 2026.10.22`;
   $("landscapeAssetRange").textContent=templateAssetRange("landscape",TEMPLATES.landscape.length);
   $("portraitAssetRange").textContent=templateAssetRange("portrait",TEMPLATES.portrait.length);
 }
@@ -1314,6 +1320,7 @@ function loadSaved(){
 
     const b=freshState();
     state=migrateRichState({...b,...x});
+    state.emphasisSize=normalizeEmphasisSize(x.emphasisSize);
     state.textOffsets=normalizeTextOffsets(x.textOffsets||state.textOffsets);
 
     const baseObjects=deepCopy(OBJ_DEFAULTS[state.orientation]||OBJ_DEFAULTS.landscape);
@@ -1501,6 +1508,7 @@ function setAsset(name,src,label){
 
   img.onload=()=>{
     obj.classList.remove("missing");
+    scheduleCheck();
     if(name==="logo"){
       requestAnimationFrame(()=>{
         constrainLogo();
@@ -1510,7 +1518,7 @@ function setAsset(name,src,label){
     }
   };
 
-  img.onerror=()=>obj.classList.add("missing");
+  img.onerror=()=>{obj.classList.add("missing");scheduleCheck();};
   img.src=src;
 }
 
@@ -1613,6 +1621,7 @@ function renderContent(){
   page.style.setProperty("--title-size",state.titleSize+"px");
   page.style.setProperty("--subtitle-size",state.subtitleSize+"px");
   page.style.setProperty("--body-size",state.bodySize+"px");
+  page.style.setProperty("--em-size",state.emphasisSize+"px");
   page.style.setProperty("--body-line",state.bodyLine);
   page.style.setProperty("--content-top",state.contentTop+"%");
   page.style.setProperty("--content-width",state.contentWidth+"%");
@@ -1772,6 +1781,60 @@ function outsideDistance(rect,bounds){
   );
 }
 
+function textInkRects(el){
+  const rects=[];
+  const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
+  while(walker.nextNode()){
+    const node=walker.currentNode;
+    if(!node.textContent.trim())continue;
+    const range=document.createRange();
+    range.selectNodeContents(node);
+    rects.push(...[...range.getClientRects()].filter(r=>r.width&&r.height));
+  }
+  return rects;
+}
+
+// Cache the opaque bounds of transparent mascot/logo PNGs; unreadable images
+// conservatively retain their full box. Never discard real clipping.
+const imageInkCache=new WeakMap();
+function objectInkRect(name,el,scale){
+  const img=imgs[name];
+  const box=el.getBoundingClientRect();
+  if(!img.complete||!img.naturalWidth||name==="photo")return box;
+  let ink=imageInkCache.get(img);
+  if(!ink||ink.src!==img.currentSrc){
+    ink={src:img.currentSrc,left:0,top:0,right:1,bottom:1};
+    try{
+      const c=document.createElement("canvas");
+      c.width=img.naturalWidth;c.height=img.naturalHeight;
+      const ctx=c.getContext("2d",{willReadFrequently:true});
+      ctx.drawImage(img,0,0);
+      const pixels=ctx.getImageData(0,0,c.width,c.height).data;
+      let l=c.width,t=c.height,r=-1,b=-1;
+      for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){
+        if(pixels[(y*c.width+x)*4+3]>0){l=Math.min(l,x);t=Math.min(t,y);r=Math.max(r,x);b=Math.max(b,y);}
+      }
+      if(r>=l)Object.assign(ink,{left:l/c.width,top:t/c.height,right:(r+1)/c.width,bottom:(b+1)/c.height});
+    }catch(e){/* Cross-origin/unsupported image: full box is the safe fallback. */}
+    imageInkCache.set(img,ink);
+  }
+  const o=state.objects[name],angle=o.rotation*Math.PI/180;
+  const w=el.offsetWidth*scale,h=el.offsetHeight*scale;
+  const cx=(box.left+box.right)/2,cy=(box.top+box.bottom)/2;
+  const corners=[[ink.left,ink.top],[ink.right,ink.top],[ink.right,ink.bottom],[ink.left,ink.bottom]].map(([x,y])=>{
+    const dx=(x-.5)*w*(o.flip?-1:1),dy=(y-.5)*h;
+    return {x:cx+dx*Math.cos(angle)-dy*Math.sin(angle),y:cy+dx*Math.sin(angle)+dy*Math.cos(angle)};
+  });
+  const left=Math.min(...corners.map(p=>p.x)),right=Math.max(...corners.map(p=>p.x));
+  const top=Math.min(...corners.map(p=>p.y)),bottom=Math.max(...corners.map(p=>p.y));
+  return {left,right,top,bottom,width:right-left,height:bottom-top};
+}
+
+function overlapDepth(a,b){
+  return Math.min(Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left)),
+    Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)));
+}
+
 function collectLayoutIssues(){
   const issues=[];
   const bounds=page.getBoundingClientRect();
@@ -1780,10 +1843,10 @@ function collectLayoutIssues(){
   const textItems=TEXT_LAYOUT_TARGETS
     .map(item=>({...item,el:$(item.id)}))
     .filter(item=>item.el.textContent.trim())
-    .map(item=>({...item,rect:item.el.getBoundingClientRect()}));
+    .map(item=>({...item,rect:item.el.getBoundingClientRect(),ink:textInkRects(item.el)}));
   const objectItems=Object.keys(objs)
     .filter(isObjectVisible)
-    .map(name=>({name,label:OBJECT_LABELS[name],el:objs[name],rect:objs[name].getBoundingClientRect()}));
+    .map(name=>({name,label:OBJECT_LABELS[name],el:objs[name],rect:objectInkRect(name,objs[name],scale)}));
 
   if(!templateReady){
     issues.push({severity:"error",message:"선택한 템플릿 파일을 불러오지 못했습니다.",focus:"templates"});
@@ -1794,7 +1857,7 @@ function collectLayoutIssues(){
     if(distance>0){
       issues.push({
         severity:distance>errorTolerance?"error":"warn",
-        message:`${item.label}이 페이지 영역을 ${Math.ceil(distance/scale)}px 벗어났습니다.`,
+        message:`${item.label}이 페이지 영역을 ${Math.ceil(distance/scale)}px 벗어났습니다. 글자 크기를 줄이거나 안쪽으로 이동해 주세요.`,
         focus:item.focus
       });
     }
@@ -1805,7 +1868,7 @@ function collectLayoutIssues(){
     if(distance>0){
       issues.push({
         severity:distance>errorTolerance?"error":"warn",
-        message:`${subjectLabel(item.label)} 페이지 영역을 ${Math.ceil(distance/scale)}px 벗어났습니다.`,
+        message:`${subjectLabel(item.label)} 페이지 영역을 ${Math.ceil(distance/scale)}px 벗어났습니다. 크기를 줄이거나 안쪽으로 이동해 주세요.`,
         object:item.name
       });
     }
@@ -1814,11 +1877,13 @@ function collectLayoutIssues(){
   for(const text of textItems){
     for(const object of objectItems){
       if(object.name==="watermark"&&state.objects.watermark.opacity<=.25)continue;
-      const ratio=intersectionRatio(text.rect,object.rect);
+      const collisions=text.ink.map(rect=>({ratio:intersectionRatio(rect,object.rect),depth:overlapDepth(rect,object.rect)}));
+      const ratio=Math.max(0,...collisions.map(c=>c.ratio));
+      const serious=collisions.some(c=>c.ratio>.08&&c.depth>4*scale);
       if(ratio>.01){
         issues.push({
-          severity:ratio>.08?"error":"warn",
-          message:`${text.label}과 ${object.label}가 ${Math.round(ratio*100)}% 겹칩니다.`,
+          severity:serious?"error":"warn",
+          message:`${text.label}의 글자와 ${object.label}가 겹칩니다${serious?"":" (경미한 접촉)"}. ${object.label} 또는 글자를 이동해 주세요.`,
           focus:text.focus,
           object:object.name
         });
@@ -1873,7 +1938,11 @@ function renderLayoutIssues(issues){
   const list=document.createElement("ul");
   for(const issue of issues.slice(0,5)){
     const li=document.createElement("li");
-    li.textContent=issue.message;
+    li.textContent=issue.message+" ";
+    const fix=document.createElement("button");
+    fix.type="button";fix.textContent="수정 위치로 이동";
+    fix.onclick=()=>focusLayoutIssue(issue);
+    li.append(fix);
     list.appendChild(li);
   }
   if(issues.length>5){
@@ -2055,6 +2124,8 @@ function renderUI(){
   $("titleSize").value=state.titleSize;
   $("subtitleSize").value=state.subtitleSize;
   $("bodySize").value=state.bodySize;
+  $("emphasisSize").value=state.emphasisSize;
+  $("emphasisSizeO").value=state.emphasisSize+"px";
   $("bodyLine").value=Math.round(state.bodyLine*100);
   $("contentTop").value=state.contentTop;
   $("contentWidth").value=state.contentWidth;
@@ -2289,6 +2360,10 @@ function downloadBlob(blob,filename){
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
+function normalizeEmphasisSize(value){
+  return typeof value==="number"&&Number.isFinite(value)?clamp(value,15,60):26;
+}
+
 function mergeImportedState(incoming){
   const b=freshState();
   const x=incoming&&incoming.state?incoming.state:incoming;
@@ -2296,6 +2371,7 @@ function mergeImportedState(incoming){
 
   const orientation=x.orientation in PAGE?x.orientation:b.orientation;
   const merged=migrateRichState({...b,...x,orientation});
+  merged.emphasisSize=normalizeEmphasisSize(x.emphasisSize);
   merged.textOffsets=normalizeTextOffsets(x.textOffsets||merged.textOffsets);
   const baseObjects=deepCopy(OBJ_DEFAULTS[orientation]);
   merged.objects={...baseObjects,...(x.objects||{})};
@@ -2339,6 +2415,8 @@ function importWorkFile(file){
 }
 
 async function makeCanvas(){
+  await document.fonts.ready;
+  await Promise.all([...page.querySelectorAll("img")].map(img=>img.decode().catch(()=>{})));
   if(!ensureSafeToExport())return null;
 
   if(!templateReady){
@@ -2392,6 +2470,40 @@ async function makeCanvas(){
   }finally{
     clone.remove();
   }
+}
+
+async function printNotice(){
+  const b=$("print");
+  // Reserve a window during the click so async image generation is not popup-blocked.
+  // makeCanvas waits for fonts/images and validates before any printing occurs.
+  const win=window.open("","_blank");
+  if(!win){alert("인쇄 창을 열 수 없습니다. 팝업을 허용하거나 PDF 저장 후 인쇄해 주세요.");return;}
+  win.document.write('<!doctype html><html lang="ko"><title>안내문 인쇄 준비</title><body><p>인쇄용 안내문을 준비하고 있습니다…</p></body></html>');
+  win.document.close();
+  b.disabled=true;
+  try{
+    const canvas=await makeCanvas();
+    if(!canvas){win.close();return;}
+    const landscape=state.orientation==="landscape";
+    const doc=win.document;
+    doc.title=safeOutputName();
+    const style=doc.createElement("style");
+    style.textContent=`@page{size:A4 ${landscape?"landscape":"portrait"};margin:0}html,body{margin:0;padding:0}img{display:block;width:${landscape?297:210}mm;height:${landscape?210:297}mm}p{font:16px sans-serif;margin:16px}@media print{p{display:none}}`;
+    doc.head.append(style);
+    const img=doc.createElement("img");
+    img.alt="인쇄용 안내문";
+    img.src=canvas.toDataURL("image/png");
+    await img.decode();
+    doc.body.replaceChildren(img);
+    const help=doc.createElement("p");
+    help.textContent="인쇄 창을 닫았다면 Ctrl/Cmd+P로 다시 인쇄할 수 있습니다. 배율 100%, 여백 없음으로 설정해 주세요.";
+    doc.body.append(help);
+    win.focus();
+    win.print();
+  }catch(e){
+    console.error(e);win.close();
+    alert("인쇄 준비 중 오류가 발생했습니다. PDF 저장을 다시 시도해 주세요.");
+  }finally{b.disabled=false;}
 }
 
 async function exportPNG(){
@@ -2526,6 +2638,7 @@ function typRange(id,key,out,fmt=v=>v){
 typRange("titleSize","titleSize","titleSizeO");
 typRange("subtitleSize","subtitleSize","subtitleSizeO");
 typRange("bodySize","bodySize","bodySizeO");
+typRange("emphasisSize","emphasisSize","emphasisSizeO",v=>v+"px");
 
 $("bodyLine").oninput=e=>{
   state.bodyLine=Number(e.target.value)/100;
@@ -2732,6 +2845,7 @@ $("textPositionReset").onclick=()=>{
   resetTextOffsets();
 };
 
+$("print").onclick=printNotice;
 $("png").onclick=exportPNG;
 $("pdf").onclick=exportPDF;
 $("workSave").onclick=exportWorkFile;
@@ -2804,6 +2918,7 @@ window.addEventListener("resize",()=>{
 updateStaticMetadata();
 loadSaved();
 render(true);
+document.fonts.ready.then(scheduleCheck);
 
 })();
 </script>
