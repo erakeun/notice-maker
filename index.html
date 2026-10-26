@@ -216,6 +216,11 @@ input[type=color]{width:42px;height:34px;border:1px solid var(--line);border-rad
 .char-thumb.active{outline:2px solid var(--blue);outline-offset:-2px}
 .char-thumb img{width:100%;height:52px;object-fit:contain;display:block}
 .char-thumb span{display:block;text-align:center;font-size:9.5px;color:#68737e;margin-top:2px}
+.char-thumb.dot-thumb img{image-rendering:pixelated}
+.char-thumb.dot-thumb span{font-size:10px;line-height:1.4;overflow-wrap:anywhere}
+.dot-character{image-rendering:pixelated}
+.char-help{margin:8px 0 0;font-size:11px;line-height:1.5;color:#586b7d}
+.char-help.warn{color:#835d08;background:#fff4d9;border-radius:7px;padding:8px}
 
 .object-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:9px 0}
 .object-tabs button,.tiny button{
@@ -681,6 +686,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         <option value="hanyangi">하냥이</option>
         <option value="college">단과대학 하냥이</option>
         <option value="hibibi">하이비비</option>
+        <option value="dot-hanyangi">도트 하냥이 · 41종</option>
+        <option value="dot-hibibi">도트 하이비비 · 24종</option>
         <option value="hylion">하이리온</option>
         <option value="hynari">하이나리</option>
       </select>
@@ -689,6 +696,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div class="field" id="charVariantField" style="display:none">
       <label><strong>캐릭터 이미지</strong><span>썸네일 선택</span></label>
       <div class="char-grid" id="charGrid"></div>
+      <p class="char-help" id="charHelp" role="status" aria-live="polite" hidden></p>
     </div>
 
     <div class="field">
@@ -830,11 +838,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   <button type="button" id="closePreview" hidden>편집으로 돌아가기</button>
 </div>
 
+<script src="assets/dot-characters.js"></script>
 <script>
 (()=>{
 "use strict";
 
-const APP_VERSION="1.7.1";
+const APP_VERSION="1.7.2";
 const STORAGE_KEY="noticeMakerV17";
 const LEGACY_STORAGE_KEYS=["noticeMakerV16","noticeMakerV14","noticeMakerV13"];
 const ALL_STORAGE_KEYS=[STORAGE_KEY,...LEGACY_STORAGE_KEYS];
@@ -887,6 +896,8 @@ const LOGOS={
 };
 
 const CHAR_COUNTS={
+  "dot-hanyangi":41,
+  "dot-hibibi":24,
   hanyangi:41,
   college:11,
   hibibi:24,
@@ -895,6 +906,8 @@ const CHAR_COUNTS={
 };
 
 const CHAR_LABELS={
+  "dot-hanyangi":"도트 하냥이",
+  "dot-hibibi":"도트 하이비비",
   hanyangi:"하냥이",
   college:"단과대학 하냥이",
   hibibi:"하이비비",
@@ -975,6 +988,8 @@ let textDrag=null;
 let topZ=20;
 let templateReady=true;
 let saveTimer=null;
+let savePending=false;
+let charThumbObserver=null;
 let mobileEditScrollY=0;
 let layoutFrame=null;
 
@@ -1284,7 +1299,7 @@ function templateAssetRange(folder,count){
 
 function updateStaticMetadata(){
   $("versionBadge").textContent=`V${APP_VERSION}`;
-  $("patchVersion").textContent=`V${APP_VERSION} · 2026.10.22`;
+  $("patchVersion").textContent=`V${APP_VERSION} · 2026.10.26`;
   $("landscapeAssetRange").textContent=templateAssetRange("landscape",TEMPLATES.landscape.length);
   $("portraitAssetRange").textContent=templateAssetRange("portrait",TEMPLATES.portrait.length);
 }
@@ -1296,7 +1311,36 @@ function templatePath(id=state.template){
 
 function charPath(){
   if(state.charCategory==="none") return "";
+  if(isDotCategory())return currentDotPose()?.svg||"";
   return `chars/${state.charCategory}_${String(state.charIndex).padStart(2,"0")}.png`;
+}
+
+function isDotCategory(category=state.charCategory){
+  return category==="dot-hanyangi"||category==="dot-hibibi";
+}
+
+function dotPoses(category=state.charCategory){
+  return (window.DOT_CHARACTERS||[]).filter(pose=>pose.category===category);
+}
+
+function currentDotPose(){
+  return isDotCategory()?dotPoses()[state.charIndex-1]:null;
+}
+
+function normalizeCharacter(target){
+  if(target.charCategory!=="none"&&!Object.hasOwn(CHAR_COUNTS,target.charCategory))target.charCategory="none";
+  const count=CHAR_COUNTS[target.charCategory]||1;
+  const index=Number(target.charIndex);
+  target.charIndex=Number.isInteger(index)&&index>=1&&index<=count?index:1;
+  if(!["logo","watermark","character","photo"].includes(target.selected))target.selected="logo";
+  return target;
+}
+
+function renderCharacterHelp(){
+  const pose=currentDotPose(),help=$("charHelp");
+  help.hidden=!pose;
+  help.classList.toggle("warn",!!pose?.hasText);
+  help.textContent=pose?`${pose.name} · 크기와 위치는 아래 캐릭터 조절에서 변경할 수 있어요.${pose.hasText?" 문자·문양이 있는 포즈예요. 좌우 반전하면 글자나 문양도 거꾸로 보일 수 있어요.":" 원본 비율과 투명 배경을 유지해요."}`:"";
 }
 
 function logoPath(type,color){
@@ -1304,15 +1348,21 @@ function logoPath(type,color){
   return LOGOS[type][color] || "";
 }
 
-function saveSoon(){
+function saveNow(){
+  if(!savePending)return;
   clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>{
-    try{
-      const copy=deepCopy(state);
-      copy.photoData="";
-      localStorage.setItem(STORAGE_KEY,JSON.stringify(copy));
-    }catch(e){}
-  },160);
+  savePending=false;
+  try{
+    const copy=deepCopy(state);
+    copy.photoData="";
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(copy));
+  }catch(e){}
+}
+
+function saveSoon(){
+  savePending=true;
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(saveNow,160);
 }
 
 function loadSaved(){
@@ -1322,7 +1372,7 @@ function loadSaved(){
     if(!x)return;
 
     const b=freshState();
-    state=migrateRichState({...b,...x});
+    state=normalizeCharacter(migrateRichState({...b,...x}));
     state.emphasisSize=normalizeEmphasisSize(x.emphasisSize);
     state.textOffsets=normalizeTextOffsets(x.textOffsets||state.textOffsets);
 
@@ -1411,7 +1461,11 @@ function buildTemplateButtons(){
 function buildCharGrid(){
   const field=$("charVariantField");
   const wrap=$("charGrid");
+  charThumbObserver?.disconnect();
+  charThumbObserver=null;
   wrap.innerHTML="";
+  wrap.scrollTop=0;
+  renderCharacterHelp();
 
   if(state.charCategory==="none"){
     field.style.display="none";
@@ -1421,20 +1475,38 @@ function buildCharGrid(){
   field.style.display="";
   const count=CHAR_COUNTS[state.charCategory]||0;
   if(state.charIndex>count)state.charIndex=1;
+  const poses=dotPoses();
+  if("IntersectionObserver" in window){
+    charThumbObserver=new IntersectionObserver(entries=>{
+      for(const entry of entries){
+        if(!entry.isIntersecting)continue;
+        const img=entry.target;
+        img.src=img.dataset.src;
+        charThumbObserver.unobserve(img);
+      }
+    },{root:wrap,rootMargin:"80px"});
+  }
 
   for(let i=1;i<=count;i++){
     const b=document.createElement("button");
+    const pose=poses[i-1];
+    const labelText=pose?`${String(i).padStart(2,"0")} · ${pose.name}`:String(i).padStart(2,"0");
     b.type="button";
-    b.className="char-thumb"+(i===state.charIndex?" active":"");
+    b.className="char-thumb"+(pose?" dot-thumb":"")+(i===state.charIndex?" active":"");
     b.setAttribute("aria-pressed",String(i===state.charIndex));
+    b.setAttribute("aria-label",`${CHAR_LABELS[state.charCategory]} ${labelText}`);
+    b.title=labelText;
 
     const img=document.createElement("img");
     img.loading="lazy";
-    img.src=`chars/${state.charCategory}_${String(i).padStart(2,"0")}.png`;
-    img.alt=`${CHAR_LABELS[state.charCategory]} ${i}`;
+    img.decoding="async";
+    img.dataset.src=pose?pose.png:`chars/${state.charCategory}_${String(i).padStart(2,"0")}.png`;
+    img.alt="";
+    if(charThumbObserver)charThumbObserver.observe(img);
+    else img.src=img.dataset.src;
 
     const label=document.createElement("span");
-    label.textContent=String(i).padStart(2,"0");
+    label.textContent=labelText;
 
     b.appendChild(img);
     b.appendChild(label);
@@ -1447,11 +1519,16 @@ function buildCharGrid(){
         x.setAttribute("aria-pressed",String(active));
       });
       renderAssets();
+      selectObject("character",false);
       saveSoon();
     };
 
     wrap.appendChild(b);
   }
+  requestAnimationFrame(()=>{
+    const active=wrap.querySelector(".active");
+    if(active&&wrap.firstElementChild)wrap.scrollTop=active.offsetTop-wrap.firstElementChild.offsetTop;
+  });
 }
 
 function applyTemplateProfile(){
@@ -1543,6 +1620,9 @@ function renderAssets(){
     charPath(),
     state.charCategory==="none"?"":`${charPath()} 필요`
   );
+  imgs.character.classList.toggle("dot-character",isDotCategory());
+  imgs.character.alt=currentDotPose()?`${CHAR_LABELS[state.charCategory]} · ${currentDotPose().name}`:"";
+  renderCharacterHelp();
 
   setAsset("photo",state.photoData,state.photoData?"사진":"");
   renderPhotoFit();
@@ -2073,6 +2153,7 @@ function updateObjectControls(){
   $("flip").style.display=rotatable?"":"none";
 
   $("flip").disabled=locked;
+  $("flip").setAttribute("aria-pressed",String(!!o.flip));
   $("front").disabled=locked;
   $("objReset").disabled=locked;
 
@@ -2159,7 +2240,7 @@ function renderUI(){
   buildTemplateButtons();
   buildCharGrid();
   renderLogoRecommendation();
-  updateObjectControls();
+  selectObject(state.selected,false);
 }
 
 function render(allUI=false){
@@ -2373,7 +2454,7 @@ function mergeImportedState(incoming){
   if(!x||typeof x!=="object")throw new Error("invalid state");
 
   const orientation=x.orientation in PAGE?x.orientation:b.orientation;
-  const merged=migrateRichState({...b,...x,orientation});
+  const merged=normalizeCharacter(migrateRichState({...b,...x,orientation}));
   merged.emphasisSize=normalizeEmphasisSize(x.emphasisSize);
   merged.textOffsets=normalizeTextOffsets(x.textOffsets||merged.textOffsets);
   const baseObjects=deepCopy(OBJ_DEFAULTS[orientation]);
@@ -2449,6 +2530,20 @@ async function makeCanvas(){
   document.body.appendChild(clone);
 
   try{
+    // Rasterize the vector pose at the final 300dpi output size. html2canvas
+    // otherwise may reuse an SVG's intrinsic bitmap and soften enlarged dots.
+    if(currentDotPose()){
+      const dotImg=clone.querySelector(".dot-character");
+      const scale=300/96;
+      const raster=document.createElement("canvas");
+      raster.width=Math.max(1,Math.ceil(objs.character.offsetWidth*scale));
+      raster.height=Math.max(1,Math.ceil(objs.character.offsetHeight*scale));
+      const context=raster.getContext("2d");
+      context.imageSmoothingEnabled=false;
+      context.drawImage(imgs.character,0,0,raster.width,raster.height);
+      dotImg.src=raster.toDataURL("image/png");
+      await dotImg.decode();
+    }
     await Promise.all([...clone.querySelectorAll("img")].map(img=>{
       if(img.complete)return Promise.resolve();
       return new Promise(resolve=>{
@@ -2700,6 +2795,8 @@ $("charCategory").onchange=e=>{
   state.charIndex=1;
   buildCharGrid();
   renderAssets();
+  if(state.charCategory!=="none")selectObject("character",false);
+  else renderObjects();
   saveSoon();
 };
 
@@ -2797,6 +2894,7 @@ $("flip").onclick=()=>{
 
   o.flip=!o.flip;
   renderObjects();
+  updateObjectControls();
   saveSoon();
 };
 
@@ -2889,6 +2987,8 @@ window.addEventListener("resize",()=>{
 });
 
 /* 시작 */
+window.addEventListener("pagehide",saveNow);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")saveNow();});
 updateStaticMetadata();
 loadSaved();
 render(true);
