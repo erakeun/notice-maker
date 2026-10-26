@@ -1,5 +1,21 @@
 # 출력 회귀 검사
 
+도트 기능 검사는 같은 로컬 서버에서 `npm run test:dots`로 실행합니다.
+하냥이 41 / 하이비비 24 포즈의 원본 이름·선택·비율, 썸네일 지연 로드,
+문자 포즈 반전 안내, 크기·위치·반전의 탭 종료 후 복원, 작업파일 왕복,
+기존 작업파일 호환, 실제 PNG/PDF/인쇄 문서, 가로로 긴 포즈의 세로 출력을
+검사합니다. 결과는 `test-results/dots/`에 저장합니다. 분석 통신은 차단합니다.
+
+외부 CDN 또는 로컬 포트 접근이 제한된 환경에서는 선택적으로
+`TEST_LOCAL_FILES=1`을 설정합니다. 이 모드는 같은 HTTP origin과 브라우저
+저장소를 유지하면서 로컬 파일을 Playwright로 제공하고, 외부 폰트 대신
+설치된 대체 글꼴을 사용합니다. 앱의 고정 버전 CDN 스크립트
+`html2canvas@1.4.1/dist/html2canvas.min.js`,
+`jspdf@2.5.1/dist/jspdf.umd.min.js`를 각각
+`test-results/vendor/html2canvas.min.js`,
+`test-results/vendor/jspdf.umd.min.js`에 미리 받아야 합니다.
+이 테스트 설정은 앱 코드의 CDN 경로를 변경하지 않습니다.
+
 정적 앱을 로컬 서버로 연 뒤 Chromium에서 검사합니다.
 
 ```sh

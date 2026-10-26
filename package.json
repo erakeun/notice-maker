@@ -1,6 +1,6 @@
 {
   "name": "notice-maker",
   "private": true,
-  "scripts": {"test": "node tests/print-regression.cjs"},
+  "scripts": {"test": "node tests/print-regression.cjs", "test:dots": "node tests/dot-regression.cjs"},
   "devDependencies": {"playwright": "1.55.0"}
 }

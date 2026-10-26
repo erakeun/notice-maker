@@ -5,10 +5,11 @@ fs.mkdirSync('test-results',{recursive:true});
 (async()=>{
  const browser=await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:1500,height:1000},acceptDownloads:true});
+ await require('./test-routing.cjs')(page,BASE_URL);
  const errors=[],dialogs=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>{dialogs.push(d.message());d.dismiss()});
  const fixture={orientation:'landscape',template:9,title:'Residence Card Collection',titleSize:48,subtitle:'',body:'① Please let us know your program type:<br>- Exchange Student (D-2-6) or<br>- Visiting Student (D-2-8) (Fee-paying)<br><br>② Please tell us your home country.',bodySize:25,emphasis:'*Please have your student ID card ready.',contentTop:24,contentWidth:76,charCategory:'hibibi',charIndex:1,textOffsets:{body:{x:0,y:65},emphasis:{x:0,y:-235}},objects:{character:{x:84,y:69,w:23,opacity:1,rotation:0,flip:false,z:7,locked:false}}};
  const result=[];
- async function load(state){await page.goto(BASE_URL);await page.evaluate(s=>localStorage.setItem('noticeMakerV17',JSON.stringify(s)),state);await page.reload();await page.evaluate(()=>document.fonts.ready);await page.locator('#templateBg').evaluate(img=>img.decode());await page.waitForTimeout(400);}
+ async function load(state){await page.goto(BASE_URL,{waitUntil:'domcontentloaded'});const imported=page.waitForEvent('dialog');await page.locator('#workFile').setInputFiles({name:'fixture.notice.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({app:'notice-maker',state}))});await imported;await page.evaluate(()=>document.fonts.ready);await page.locator('#templateBg').evaluate(img=>img.decode());await page.waitForTimeout(400);}
  async function status(){return page.locator('#layoutWarning').innerText()}
  async function savePDF(name){const d=page.waitForEvent('download',{timeout:30000});await page.locator('#pdf').click();await (await d).saveAs('test-results/'+name+'.pdf');}
  await load(fixture);console.log('initial',await status());console.log('libraries',await page.evaluate(()=>({canvas:typeof html2canvas,pdf:typeof jspdf})));
