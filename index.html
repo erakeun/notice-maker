@@ -348,7 +348,7 @@ input[type=color]{width:42px;height:34px;border:1px solid var(--line);border-rad
 .patch-panel details{border-top:1px solid #edf0f2;margin-top:10px;padding-top:9px}
 .patch-panel summary{cursor:pointer;font-size:11px;font-weight:750;color:#4c6071}
 .patch-version{margin-top:9px;font-size:10.5px;line-height:1.6;color:#65717d}
-.feedback-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.feedback-actions{display:grid;grid-template-columns:1fr;gap:7px}
 .feedback-actions a,.feedback-actions button{
   display:flex;align-items:center;justify-content:center;text-decoration:none;border:1px solid var(--line);
   border-radius:9px;padding:10px 8px;background:#fff;color:#334556;font-size:11.5px;font-weight:750
@@ -418,6 +418,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .touch-label{min-height:44px}
   summary{min-height:44px;display:flex;align-items:center}
 }
+
+.mach-feedback .feedback-actions a{min-height:44px;text-align:center}
+.mach-feedback .feedback-actions a:focus-visible{outline:3px solid #165dcb;outline-offset:3px}
+@media print{.mach-feedback{display:none!important}}
 </style>
 <style id="mach-home-navigation-style">
 /* Screen navigation only. Keep outside all generated artwork. */
@@ -727,12 +731,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
   </details>
 
-  <section class="section">
+  <section class="section mach-feedback" data-html2canvas-ignore="true">
     <h2>5. 피드백</h2>
-    <p class="note">GitHub 없이 메일로만 오류나 개선 의견을 받을 수 있게 해뒀어.</p>
+    <p class="note">불편신고, 수정·기능요청, 응원을 비공개로 보내 주세요.</p>
     <div class="feedback-actions">
-      <a href="#" id="feedbackMail">✉ 피드백 메일 보내기</a>
-      <button type="button" id="copyMail">메일 주소 복사</button>
+      <a data-mach-feedback="04" href="https://script.google.com/macros/s/AKfycby2ShSY4ruQr9Ku-QlljB05Ygk3ygDRtX-hXWO0hfUmEULl-jK9Z7mqh_k2m9GSV70v/exec?tool=04" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">의견 보내기 (새 창)</a>
     </div>
   </section>
 
@@ -2860,35 +2863,6 @@ document.addEventListener("keydown",e=>{
     closeMobilePreview();
   }
 });
-
-const FEEDBACK_EMAIL="keun0810@hanyang.ac.kr";
-$("feedbackMail").onclick=e=>{
-  e.preventDefault();
-  const subject="[안내문 제작기 피드백]";
-  const body=[
-    `안내문 제작기 V${APP_VERSION} 피드백입니다.`,
-    "",
-    "[구분]",
-    "오류 / 개선 제안 / 기타",
-    "",
-    "[내용]",
-    "",
-    "",
-    "[사용 환경]",
-    `브라우저: ${navigator.userAgent}`,
-    `페이지: ${location.href}`
-  ].join("\n");
-  location.href=`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-};
-
-$("copyMail").onclick=async()=>{
-  try{
-    await navigator.clipboard.writeText(FEEDBACK_EMAIL);
-    alert("피드백 메일 주소를 복사했어.\n"+FEEDBACK_EMAIL);
-  }catch(e){
-    prompt("아래 메일 주소를 복사해줘.",FEEDBACK_EMAIL);
-  }
-};
 
 $("save").onclick=()=>{
   saveSoon();
