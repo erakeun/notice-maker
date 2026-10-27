@@ -277,6 +277,9 @@ input[type=color]{width:42px;height:34px;border:1px solid var(--line);border-rad
 }
 .page.exporting{box-shadow:none}
 .template-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:0;pointer-events:none}
+.template-seal-cover{position:absolute;z-index:1;background:#fff;pointer-events:none}
+.template-seal-cover[hidden]{display:none}
+.template-seal-cover img{position:absolute;object-fit:contain;display:block;image-rendering:auto}
 .template-missing{
   position:absolute;inset:0;display:none;place-items:center;background:#fff;z-index:0;
   color:#9a3c3c;font-size:17px;font-weight:700;text-align:center;padding:40px;white-space:pre-line
@@ -776,6 +779,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div class="shell" id="shell">
       <div class="page" id="page">
         <img class="template-bg" id="templateBg" alt="">
+        <div class="template-seal-cover" id="templateSealCover" aria-hidden="true" hidden><img id="templateSealImg" alt=""></div>
         <div class="template-missing" id="templateMissing"></div>
 
         <div class="safe"></div>
@@ -987,6 +991,8 @@ let drag=null;
 let textDrag=null;
 let topZ=20;
 let templateReady=true;
+let templateSealStatus="inactive";
+let templateSealRequest=0;
 let saveTimer=null;
 let savePending=false;
 let charThumbObserver=null;
@@ -998,6 +1004,8 @@ const stage=$("stage");
 const stageStack=$("stageStack");
 const shell=$("shell");
 const templateBg=$("templateBg");
+const templateSealCover=$("templateSealCover");
+const templateSealImg=$("templateSealImg");
 
 const objs={
   logo:$("logoObj"),
@@ -1650,7 +1658,58 @@ function renderPhotoFit(){
   }
 }
 
+// White Lion's immutable 1040×720 background contains only an 89×87px seal.
+// Keep that artwork untouched; cover just its measured white-field seal bounds
+// with the existing 1157×1157 official logo, at the same page position/size.
+const WHITE_LION_SEAL=Object.freeze({
+  sourceWidth:1040,sourceHeight:720,
+  cover:Object.freeze({x:916,y:31,w:93,h:91}),
+  image:Object.freeze({x:918,y:33,w:89,h:87}),
+  src:"logos/hyu_round.png"
+});
+
+function needsTemplateSeal(){
+  return state.orientation==="landscape" && Number(state.template)===3;
+}
+
+function renderTemplateSeal(){
+  const request=++templateSealRequest;
+  templateSealCover.hidden=true;
+  templateSealImg.onload=null;
+  templateSealImg.onerror=null;
+  if(!needsTemplateSeal()){
+    templateSealStatus="inactive";
+    templateSealImg.removeAttribute("src");
+    return;
+  }
+  const {sourceWidth,sourceHeight,cover,image,src}=WHITE_LION_SEAL;
+  Object.assign(templateSealCover.style,{
+    left:(cover.x/sourceWidth*100)+"%",top:(cover.y/sourceHeight*100)+"%",
+    width:(cover.w/sourceWidth*100)+"%",height:(cover.h/sourceHeight*100)+"%"
+  });
+  Object.assign(templateSealImg.style,{
+    left:((image.x-cover.x)/cover.w*100)+"%",top:((image.y-cover.y)/cover.h*100)+"%",
+    width:(image.w/cover.w*100)+"%",height:(image.h/cover.h*100)+"%"
+  });
+  templateSealStatus="loading";
+  templateSealImg.onload=()=>{
+    if(request!==templateSealRequest)return;
+    templateSealStatus="ready";
+    templateSealCover.hidden=false;
+    scheduleCheck();
+  };
+  templateSealImg.onerror=()=>{
+    if(request!==templateSealRequest)return;
+    templateSealStatus="error";
+    templateSealCover.hidden=true;
+    scheduleCheck();
+  };
+  templateSealImg.src=src;
+  if(templateSealImg.complete && templateSealImg.naturalWidth>0)templateSealImg.onload();
+}
+
 function renderTemplate(){
+  renderTemplateSeal();
   templateReady=true;
   $("templateMissing").style.display="none";
   templateBg.style.display="block";
@@ -1933,6 +1992,11 @@ function collectLayoutIssues(){
 
   if(!templateReady){
     issues.push({severity:"error",message:"선택한 템플릿 파일을 불러오지 못했습니다.",focus:"templates"});
+  }
+  if(needsTemplateSeal() && templateSealStatus!=="ready"){
+    issues.push({severity:"error",message:templateSealStatus==="error"
+      ?"템플릿 고해상도 로고를 불러오지 못했습니다. 연결 상태를 확인한 뒤 템플릿을 다시 선택해 주세요."
+      :"템플릿 고해상도 로고를 불러오는 중입니다.",focus:"templates"});
   }
 
   for(const item of textItems){
