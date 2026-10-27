@@ -280,6 +280,9 @@ input[type=color]{width:42px;height:34px;border:1px solid var(--line);border-rad
 .template-seal-cover{position:absolute;z-index:1;background:#fff;pointer-events:none}
 .template-seal-cover[hidden]{display:none}
 .template-seal-cover img{position:absolute;object-fit:contain;display:block;image-rendering:auto}
+.template-wordmark-cover{position:absolute;z-index:1;background:#fff;pointer-events:none}
+.template-wordmark-cover[hidden]{display:none}
+.template-wordmark-cover img{position:absolute;object-fit:contain;display:block;image-rendering:auto}
 .template-missing{
   position:absolute;inset:0;display:none;place-items:center;background:#fff;z-index:0;
   color:#9a3c3c;font-size:17px;font-weight:700;text-align:center;padding:40px;white-space:pre-line
@@ -780,6 +783,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <div class="page" id="page">
         <img class="template-bg" id="templateBg" alt="">
         <div class="template-seal-cover" id="templateSealCover" aria-hidden="true" hidden><img id="templateSealImg" alt=""></div>
+        <div class="template-wordmark-cover" id="templateWordmarkCover" aria-hidden="true" hidden><img id="templateWordmarkImg" alt=""></div>
         <div class="template-missing" id="templateMissing"></div>
 
         <div class="safe"></div>
@@ -993,6 +997,8 @@ let topZ=20;
 let templateReady=true;
 let templateSealStatus="inactive";
 let templateSealRequest=0;
+let templateWordmarkStatus="inactive";
+let templateWordmarkRequest=0;
 let saveTimer=null;
 let savePending=false;
 let charThumbObserver=null;
@@ -1006,6 +1012,8 @@ const shell=$("shell");
 const templateBg=$("templateBg");
 const templateSealCover=$("templateSealCover");
 const templateSealImg=$("templateSealImg");
+const templateWordmarkCover=$("templateWordmarkCover");
+const templateWordmarkImg=$("templateWordmarkImg");
 
 const objs={
   logo:$("logoObj"),
@@ -1708,8 +1716,60 @@ function renderTemplateSeal(){
   if(templateSealImg.complete && templateSealImg.naturalWidth>0)templateSealImg.onload();
 }
 
+
+// The same background has a 206×19px baked-in English wordmark. Use the
+// university's unmodified 3002×254 official Blue PNG; contain preserves its
+// native aspect ratio within the original centered footprint. See asset notes.
+const WHITE_LION_WORDMARK=Object.freeze({
+  sourceWidth:1040,sourceHeight:720,
+  cover:Object.freeze({x:415,y:661,w:210,h:25}),
+  image:Object.freeze({x:418,y:664,w:204,h:19}),
+  src:"logos/hyu_english.png"
+});
+
+function needsTemplateWordmark(){
+  return state.orientation==="landscape" && Number(state.template)===3;
+}
+
+function renderTemplateWordmark(){
+  const request=++templateWordmarkRequest;
+  templateWordmarkCover.hidden=true;
+  templateWordmarkImg.onload=null;
+  templateWordmarkImg.onerror=null;
+  if(!needsTemplateWordmark()){
+    templateWordmarkStatus="inactive";
+    templateWordmarkImg.removeAttribute("src");
+    return;
+  }
+  const {sourceWidth,sourceHeight,cover,image,src}=WHITE_LION_WORDMARK;
+  Object.assign(templateWordmarkCover.style,{
+    left:(cover.x/sourceWidth*100)+"%",top:(cover.y/sourceHeight*100)+"%",
+    width:(cover.w/sourceWidth*100)+"%",height:(cover.h/sourceHeight*100)+"%"
+  });
+  Object.assign(templateWordmarkImg.style,{
+    left:((image.x-cover.x)/cover.w*100)+"%",top:((image.y-cover.y)/cover.h*100)+"%",
+    width:(image.w/cover.w*100)+"%",height:(image.h/cover.h*100)+"%"
+  });
+  templateWordmarkStatus="loading";
+  templateWordmarkImg.onload=()=>{
+    if(request!==templateWordmarkRequest)return;
+    templateWordmarkStatus="ready";
+    templateWordmarkCover.hidden=false;
+    scheduleCheck();
+  };
+  templateWordmarkImg.onerror=()=>{
+    if(request!==templateWordmarkRequest)return;
+    templateWordmarkStatus="error";
+    templateWordmarkCover.hidden=true;
+    scheduleCheck();
+  };
+  templateWordmarkImg.src=src;
+  if(templateWordmarkImg.complete && templateWordmarkImg.naturalWidth>0)templateWordmarkImg.onload();
+}
+
 function renderTemplate(){
   renderTemplateSeal();
+  renderTemplateWordmark();
   templateReady=true;
   $("templateMissing").style.display="none";
   templateBg.style.display="block";
@@ -1997,6 +2057,12 @@ function collectLayoutIssues(){
     issues.push({severity:"error",message:templateSealStatus==="error"
       ?"템플릿 고해상도 로고를 불러오지 못했습니다. 연결 상태를 확인한 뒤 템플릿을 다시 선택해 주세요."
       :"템플릿 고해상도 로고를 불러오는 중입니다.",focus:"templates"});
+  }
+
+  if(needsTemplateWordmark() && templateWordmarkStatus!=="ready"){
+    issues.push({severity:"error",message:templateWordmarkStatus==="error"
+      ? "하단 고해상도 로고를 불러오지 못했습니다. 연결 상태를 확인하고 템플릿을 다시 선택해 주세요."
+      : "하단 고해상도 로고를 불러오는 중입니다. 잠시 후 다시 출력해 주세요.",focus:"templates"});
   }
 
   for(const item of textItems){
